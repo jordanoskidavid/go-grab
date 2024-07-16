@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,57 +12,79 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
+// Set to keep track of visited URLs
+var visited = make(map[string]bool)
+
 func main() {
+	startURL := "https://scrapeme.live/shop/"
+	crawl(startURL)
+}
 
-	url := "https://shampion.mk"
+func crawl(baseURL string) {
+	toVisit := []string{baseURL}
 
-	resp, err := http.Get(url) //zema response ili greshka od sajto sho mu go davame
-	if err != nil {
-		log.Fatal("URL e nedostapno: ", err)
+	for len(toVisit) > 0 {
+		// Get the next URL to visit
+		url := toVisit[0]
+		toVisit = toVisit[1:]
+
+		// Skip if already visited
+		if visited[url] {
+			continue
+		}
+
+		fmt.Println("Fetching:", url)
+		visited[url] = true
+
+		// Scrape and extract links
+		links, err := scrapeAndExtractLinks(url)
+		if err != nil {
+			log.Printf("Error scraping %s: %v\n", url, err)
+			continue
+		}
+
+		// Add new links to the to-visit list
+		for _, link := range links {
+			if !visited[link] {
+				toVisit = append(toVisit, link)
+			}
+		}
 	}
-	defer resp.Body.Close() //ova go zatvora responese body od ko ce procita za da ne bara dodatno
+}
 
-	//sledno proveruva dali responso ni e 200 ako ne e frla exception
+func scrapeAndExtractLinks(pageURL string) ([]string, error) {
+	resp, err := http.Get(pageURL)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching URL %s: %v", pageURL, err)
+	}
+	defer resp.Body.Close()
+
 	if resp.StatusCode != 200 {
-		log.Fatal("Greska pri vcituvanje na kodo", err)
+		return nil, fmt.Errorf("unexpected status code %d for URL %s", resp.StatusCode, pageURL)
 	}
 
-	//koristam goquery za da go zemi HTML-o, ako ne mozhi frla exception
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
-
 	if err != nil {
-		log.Fatal("Ne mozi da se vcita HTML:", err)
+		return nil, fmt.Errorf("error loading HTML from URL %s: %v", pageURL, err)
 	}
 
-	//funkcija za da isfiltrira se sho ne e tekst
+	// Remove <style> and <script> tags
+	doc.Find("style, script, .jquery-script").Remove()
+
+	// Extract human-readable text content
+	var textContent strings.Builder
+	lastWasSpace := true
 
 	filterNonText := func(i int, s *goquery.Selection) bool {
 		tagName := strings.ToLower(s.Get(0).Data)
 		return tagName == "p" || tagName == "div" || tagName == "span" || tagName == "a"
-		//vrajcha p, div, span i a sodrzhini
 	}
-	//Sledno bara vo body preku koristenje na filter funkcijata so koristenje kako vlezen parametar funkcijata za filtriranje na non-text
+
 	doc.Find("body *").FilterFunction(filterNonText).Each(func(i int, s *goquery.Selection) {
 		text := strings.TrimSpace(s.Text())
 		if text != "" {
-			fmt.Println(text)
-		}
-	})
-
-	//	ovde dolu gi trga nepotrebnite kodovi, vo slucajov css javascript i jquery za da se dobija chist tekst
-
-	doc.Find("style").Remove()
-	doc.Find("script").Remove()
-	doc.Find(".jquery-script").Remove()
-
-	lastWasSpace := true // che proveruva dali poslednio element imal mesto
-	var textContent strings.Builder
-	doc.Find("body *").Each(func(i int, s *goquery.Selection) {
-		text := strings.TrimSpace(s.Text())
-		if text != "" {
-
 			if !lastWasSpace && textContent.Len() > 0 {
-				textContent.WriteString(" ") //da dodaj mesto izmedzu ako nema voopsto
+				textContent.WriteString(" ")
 			}
 			textContent.WriteString(text)
 			lastWasSpace = false
@@ -70,29 +93,44 @@ func main() {
 		}
 	})
 
-	fmt.Println("TEXT THAT I NEED:")
-	fmt.Println(textContent.String())
-
-	// da se zacuvuva seto ova vo text
-	fileName := "extracted_content.txt"
+	// Save extracted text content to a text file
+	fileName := fmt.Sprintf("extracted_content_%s.txt", sanitizeFilename(pageURL))
 	file, err := os.Create(fileName)
 	if err != nil {
-		log.Fatalf("Greshka pri kreiranje na fajlo: %v", err)
+		return nil, fmt.Errorf("error creating file: %v", err)
 	}
 	defer file.Close()
 
 	_, err = file.WriteString(textContent.String())
 	if err != nil {
-		log.Fatalf("Greshka pri writing na fajlo %v", err)
+		return nil, fmt.Errorf("error writing to file: %v", err)
 	}
-
-	//ovde samo printa dali se zacuvuva
-	fmt.Printf("fajlot e zacuvan %s\n", fileName)
 
 	absPath, err := filepath.Abs(fileName)
 	if err != nil {
-		log.Fatalf("Ne mozi da se dobija patekata  %v", err)
+		return nil, fmt.Errorf("error getting absolute path: %v", err)
 	}
-	fmt.Printf("Teksto e zacuvan vo:\n%s\n", absPath)
+	fmt.Printf("Extracted text content saved to: %s\n", absPath)
 
+	// Extract links
+	var links []string
+	base, err := url.Parse(pageURL)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing base URL %s: %v", pageURL, err)
+	}
+
+	doc.Find("a[href]").Each(func(i int, s *goquery.Selection) {
+		link, exists := s.Attr("href")
+		if exists {
+			// Resolve relative URLs
+			absLink := base.ResolveReference(&url.URL{Path: link}).String()
+			links = append(links, absLink)
+		}
+	})
+
+	return links, nil
+}
+
+func sanitizeFilename(url string) string {
+	return strings.ReplaceAll(url, "/", "_")
 }
