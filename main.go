@@ -12,7 +12,6 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-// Set to keep track of visited URLs
 var visited = make(map[string]bool)
 
 func main() {
@@ -24,11 +23,9 @@ func crawl(baseURL string) {
 	toVisit := []string{baseURL}
 
 	for len(toVisit) > 0 {
-		// Get the next URL to visit
 		url := toVisit[0]
 		toVisit = toVisit[1:]
 
-		// Skip if already visited
 		if visited[url] {
 			continue
 		}
@@ -36,14 +33,12 @@ func crawl(baseURL string) {
 		fmt.Println("Fetching:", url)
 		visited[url] = true
 
-		// Scrape and extract links
 		links, err := scrapeAndExtractLinks(url)
 		if err != nil {
 			log.Printf("Error scraping %s: %v\n", url, err)
 			continue
 		}
 
-		// Add new links to the to-visit list
 		for _, link := range links {
 			if !visited[link] {
 				toVisit = append(toVisit, link)
@@ -68,10 +63,8 @@ func scrapeAndExtractLinks(pageURL string) ([]string, error) {
 		return nil, fmt.Errorf("error loading HTML from URL %s: %v", pageURL, err)
 	}
 
-	// Remove <style> and <script> tags
 	doc.Find("style, script, .jquery-script").Remove()
 
-	// Extract human-readable text content
 	var textContent strings.Builder
 	lastWasSpace := true
 
@@ -93,7 +86,6 @@ func scrapeAndExtractLinks(pageURL string) ([]string, error) {
 		}
 	})
 
-	// Save extracted text content to a text file
 	fileName := fmt.Sprintf("extracted_content_%s.txt", sanitizeFilename(pageURL))
 	file, err := os.Create(fileName)
 	if err != nil {
@@ -112,7 +104,6 @@ func scrapeAndExtractLinks(pageURL string) ([]string, error) {
 	}
 	fmt.Printf("Extracted text content saved to: %s\n", absPath)
 
-	// Extract links
 	var links []string
 	base, err := url.Parse(pageURL)
 	if err != nil {
@@ -122,7 +113,6 @@ func scrapeAndExtractLinks(pageURL string) ([]string, error) {
 	doc.Find("a[href]").Each(func(i int, s *goquery.Selection) {
 		link, exists := s.Attr("href")
 		if exists {
-			// Resolve relative URLs
 			absLink := base.ResolveReference(&url.URL{Path: link}).String()
 			links = append(links, absLink)
 		}
