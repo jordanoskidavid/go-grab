@@ -100,22 +100,22 @@ func scrapeAndExtractLinks(pageURL string) ([]string, error) {
 		}
 	})
 
-	// Removing spaces that aint needed
+	//Removing spaces that aint needed
 	finalText := strings.TrimSpace(textContent.String())
 	finalText = removeBlankLines(finalText)
 	finalText = removeExtraSpaces(finalText)
 
-	// Get the page title
+	//Get the page title to use it later
 	pageTitle := doc.Find("title").Text()
 
-	// Construct the page data
+	//Page data construction
 	page := PageData{
 		Title:   pageTitle,
 		URL:     pageURL,
 		Content: finalText,
 	}
 
-	// Append the page data to the JSON file
+	//Appending the data into the JSON file
 	appendToFile(page)
 
 	// Extract links from the page
@@ -156,16 +156,16 @@ func appendToFile(page PageData) {
 		}
 	}
 
-	// Append the new page data
+	//Append the new pages into the one that is saved all the time while the webscraping is running till interupt
 	pages = append(pages, page)
 
-	// Marshal the pages slice to JSON
+	//Marshaling the slices into JSON
 	jsonData, err := json.MarshalIndent(pages, "", "    ")
 	if err != nil {
 		log.Fatalf("Error marshalling JSON: %v", err)
 	}
 
-	// Write the JSON data to file
+	//Writing all the data that has been converted in JSON to the file
 	file, err := os.Create(fileName)
 	if err != nil {
 		log.Fatalf("Error creating file: %v", err)
@@ -184,7 +184,7 @@ func appendToFile(page PageData) {
 	fmt.Printf("Page data appended to: %s\n", absPath)
 }
 
-// Filter functions
+// Filter functions for removing the blank and extra spaces, all to be tidy
 func removeBlankLines(text string) string {
 	var result strings.Builder
 	lines := strings.Split(text, "\n")
