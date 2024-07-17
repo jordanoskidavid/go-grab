@@ -15,7 +15,7 @@ import (
 
 var visited = make(map[string]bool)
 
-// making structure that can be used for storing JSON
+// structure for storing the json data
 type PageData struct {
 	Title   string `json:"title"`
 	URL     string `json:"url"`
@@ -24,10 +24,11 @@ type PageData struct {
 
 func main() {
 	startURL := "https://scrapeme.live/shop/"
-	crawl(startURL) //crawling the url
+	crawl(startURL) // Crawling the URL
+	fmt.Println("Crawling completed.")
 }
 
-// setting up the function where checks all the "visited" pages
+// Crawl function to check all the "visited" pages
 func crawl(baseURL string) {
 	toVisit := []string{baseURL}
 
@@ -55,9 +56,9 @@ func crawl(baseURL string) {
 	}
 }
 
-// getting the html code and then transforming it with the goquery library
+// Scrape and extract links from the page
 func scrapeAndExtractLinks(pageURL string) ([]string, error) {
-	resp, err := http.Get(pageURL)
+	resp, err := http.Get(pageURL) //this function is able to get the url's from the crawl function and check if the fetching url is OK or throws an error and gets the response code back
 	if err != nil {
 		return nil, fmt.Errorf("error fetching URL %s: %v", pageURL, err)
 	}
@@ -66,22 +67,24 @@ func scrapeAndExtractLinks(pageURL string) ([]string, error) {
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("unexpected status code %d for URL %s", resp.StatusCode, pageURL)
 	}
-
+	//down here the goquery library gets the html code and check if html is taken and pass it to the go query
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error loading HTML from URL %s: %v", pageURL, err)
 	}
-
+	//here with using doc.find is finding css js and jquery and removes it
 	doc.Find("style, script, .jquery-script").Remove()
 
 	var textContent strings.Builder
 	lastWasSpace := true
 
+	//down here is filtering the usage of the nontext strings and returns only p div span and a tags
+
 	filterNonText := func(i int, s *goquery.Selection) bool {
 		tagName := strings.ToLower(s.Get(0).Data)
 		return tagName == "p" || tagName == "div" || tagName == "span" || tagName == "a"
 	}
-
+	//here it goes through body page
 	doc.Find("body *").FilterFunction(filterNonText).Each(func(i int, s *goquery.Selection) {
 		text := strings.TrimSpace(s.Text())
 		if text != "" {
@@ -97,51 +100,25 @@ func scrapeAndExtractLinks(pageURL string) ([]string, error) {
 		}
 	})
 
-	//Removing the blank spaces
+	// Removing spaces that aint needed
 	finalText := strings.TrimSpace(textContent.String())
-
-	//Removing the blank lines
 	finalText = removeBlankLines(finalText)
-
-	//Removing spaces that are extrra
 	finalText = removeExtraSpaces(finalText)
 
-	//Getting the page title
+	// Get the page title
 	pageTitle := doc.Find("title").Text()
 
-	//Constucting the page data where it takes page title, url and filtered text that can be stored
+	// Construct the page data
 	page := PageData{
 		Title:   pageTitle,
 		URL:     pageURL,
 		Content: finalText,
 	}
 
-	// Marshal PageData struct to JSON
-	jsonData, err := json.MarshalIndent(page, "", "    ")
-	if err != nil {
-		return nil, fmt.Errorf("error marshalling JSON: %v", err)
-	}
+	// Append the page data to the JSON file
+	appendToFile(page)
 
-	// Write JSON data to file
-	fileName := fmt.Sprintf("scraped_files/scraped_data_%s.json", sanitizeFilename(pageURL))
-	file, err := os.Create(fileName)
-	if err != nil {
-		return nil, fmt.Errorf("error creating file: %v", err)
-	}
-	defer file.Close()
-
-	_, err = file.Write(jsonData)
-	if err != nil {
-		return nil, fmt.Errorf("error writing to file: %v", err)
-	}
-
-	absPath, err := filepath.Abs(fileName)
-	if err != nil {
-		return nil, fmt.Errorf("error getting absolute path: %v", err)
-	}
-	fmt.Printf("Page data saved to: %s\n", absPath)
-
-	//Converting the struct into JSON
+	// Extract links from the page
 	var links []string
 	base, err := url.Parse(pageURL)
 	if err != nil {
@@ -159,7 +136,55 @@ func scrapeAndExtractLinks(pageURL string) ([]string, error) {
 	return links, nil
 }
 
-// These all are filter functions that are used up above :)
+// Append page data to the JSON file
+func appendToFile(page PageData) {
+	fileName := "scraped_data.json"
+	var pages []PageData
+
+	// Check if the file already exists
+	if _, err := os.Stat(fileName); err == nil {
+		// File exists, read the current contents
+		file, err := os.Open(fileName)
+		if err != nil {
+			log.Fatalf("Error opening file: %v", err)
+		}
+		defer file.Close()
+
+		decoder := json.NewDecoder(file)
+		if err := decoder.Decode(&pages); err != nil {
+			log.Fatalf("Error decoding JSON: %v", err)
+		}
+	}
+
+	// Append the new page data
+	pages = append(pages, page)
+
+	// Marshal the pages slice to JSON
+	jsonData, err := json.MarshalIndent(pages, "", "    ")
+	if err != nil {
+		log.Fatalf("Error marshalling JSON: %v", err)
+	}
+
+	// Write the JSON data to file
+	file, err := os.Create(fileName)
+	if err != nil {
+		log.Fatalf("Error creating file: %v", err)
+	}
+	defer file.Close()
+
+	_, err = file.Write(jsonData)
+	if err != nil {
+		log.Fatalf("Error writing to file: %v", err)
+	}
+
+	absPath, err := filepath.Abs(fileName)
+	if err != nil {
+		log.Fatalf("Error getting absolute path: %v", err)
+	}
+	fmt.Printf("Page data appended to: %s\n", absPath)
+}
+
+// Filter functions
 func removeBlankLines(text string) string {
 	var result strings.Builder
 	lines := strings.Split(text, "\n")
@@ -178,8 +203,4 @@ func removeBlankLines(text string) string {
 func removeExtraSpaces(text string) string {
 	words := strings.Fields(text)
 	return strings.Join(words, " ")
-}
-
-func sanitizeFilename(url string) string {
-	return strings.ReplaceAll(url, "/", "_")
 }
