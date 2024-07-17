@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -14,19 +15,25 @@ import (
 
 var visited = make(map[string]bool)
 
-func main() {
-	startURL := "https://scrapeme.live/shop/" //take the url
-	crawl(startURL)                           //crawling the website url
+// making structure that can be used for storing JSON
+type PageData struct {
+	Title   string `json:"title"`
+	URL     string `json:"url"`
+	Content string `json:"content"`
 }
 
-// function for crawling into the website links
+func main() {
+	startURL := "https://scrapeme.live/shop/"
+	crawl(startURL) //crawling the url
+}
+
+// setting up the function where checks all the "visited" pages
 func crawl(baseURL string) {
 	toVisit := []string{baseURL}
 
 	for len(toVisit) > 0 {
 		url := toVisit[0]
 		toVisit = toVisit[1:]
-
 		if visited[url] {
 			continue
 		}
@@ -48,7 +55,7 @@ func crawl(baseURL string) {
 	}
 }
 
-// scraping the website from html into goquery with some additional filters for human-readable text
+// getting the html code and then transforming it with the goquery library
 func scrapeAndExtractLinks(pageURL string) ([]string, error) {
 	resp, err := http.Get(pageURL)
 	if err != nil {
@@ -90,23 +97,40 @@ func scrapeAndExtractLinks(pageURL string) ([]string, error) {
 		}
 	})
 
-	// Remove any trailing whitespace
+	//Removing the blank spaces
 	finalText := strings.TrimSpace(textContent.String())
 
-	// Remove blank lines
+	//Removing the blank lines
 	finalText = removeBlankLines(finalText)
 
-	// Remove extra spaces
+	//Removing spaces that are extrra
 	finalText = removeExtraSpaces(finalText)
 
-	fileName := fmt.Sprintf("scraped_files/scraped_file_%s.txt", sanitizeFilename(pageURL))
+	//Getting the page title
+	pageTitle := doc.Find("title").Text()
+
+	//Constucting the page data where it takes page title, url and filtered text that can be stored
+	page := PageData{
+		Title:   pageTitle,
+		URL:     pageURL,
+		Content: finalText,
+	}
+
+	// Marshal PageData struct to JSON
+	jsonData, err := json.MarshalIndent(page, "", "    ")
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling JSON: %v", err)
+	}
+
+	// Write JSON data to file
+	fileName := fmt.Sprintf("scraped_files/scraped_data_%s.json", sanitizeFilename(pageURL))
 	file, err := os.Create(fileName)
 	if err != nil {
 		return nil, fmt.Errorf("error creating file: %v", err)
 	}
 	defer file.Close()
 
-	_, err = file.WriteString(finalText) // Use finalText here
+	_, err = file.Write(jsonData)
 	if err != nil {
 		return nil, fmt.Errorf("error writing to file: %v", err)
 	}
@@ -115,8 +139,9 @@ func scrapeAndExtractLinks(pageURL string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error getting absolute path: %v", err)
 	}
-	fmt.Printf("Extracted text content saved to: %s\n", absPath)
+	fmt.Printf("Page data saved to: %s\n", absPath)
 
+	//Converting the struct into JSON
 	var links []string
 	base, err := url.Parse(pageURL)
 	if err != nil {
@@ -134,6 +159,7 @@ func scrapeAndExtractLinks(pageURL string) ([]string, error) {
 	return links, nil
 }
 
+// These all are filter functions that are used up above :)
 func removeBlankLines(text string) string {
 	var result strings.Builder
 	lines := strings.Split(text, "\n")
@@ -149,7 +175,6 @@ func removeBlankLines(text string) string {
 	return result.String()
 }
 
-// Function to remove extra spaces
 func removeExtraSpaces(text string) string {
 	words := strings.Fields(text)
 	return strings.Join(words, " ")
