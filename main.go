@@ -15,10 +15,11 @@ import (
 var visited = make(map[string]bool)
 
 func main() {
-	startURL := "https://scrapeme.live/shop/"
-	crawl(startURL)
+	startURL := "https://scrapeme.live/shop/" //take the url
+	crawl(startURL)                           //crawling the website url
 }
 
+// function for crawling into the website links
 func crawl(baseURL string) {
 	toVisit := []string{baseURL}
 
@@ -47,6 +48,7 @@ func crawl(baseURL string) {
 	}
 }
 
+// scraping the website from html into goquery with some additional filters for human-readable text
 func scrapeAndExtractLinks(pageURL string) ([]string, error) {
 	resp, err := http.Get(pageURL)
 	if err != nil {
@@ -76,6 +78,8 @@ func scrapeAndExtractLinks(pageURL string) ([]string, error) {
 	doc.Find("body *").FilterFunction(filterNonText).Each(func(i int, s *goquery.Selection) {
 		text := strings.TrimSpace(s.Text())
 		if text != "" {
+			text = strings.ReplaceAll(text, "\t", " ")
+
 			if !lastWasSpace && textContent.Len() > 0 {
 				textContent.WriteString(" ")
 			}
@@ -86,14 +90,23 @@ func scrapeAndExtractLinks(pageURL string) ([]string, error) {
 		}
 	})
 
-	fileName := fmt.Sprintf("extracted_content_%s.txt", sanitizeFilename(pageURL))
+	// Remove any trailing whitespace
+	finalText := strings.TrimSpace(textContent.String())
+
+	// Remove blank lines
+	finalText = removeBlankLines(finalText)
+
+	// Remove extra spaces
+	finalText = removeExtraSpaces(finalText)
+
+	fileName := fmt.Sprintf("scraped_files/scraped_file_%s.txt", sanitizeFilename(pageURL))
 	file, err := os.Create(fileName)
 	if err != nil {
 		return nil, fmt.Errorf("error creating file: %v", err)
 	}
 	defer file.Close()
 
-	_, err = file.WriteString(textContent.String())
+	_, err = file.WriteString(finalText) // Use finalText here
 	if err != nil {
 		return nil, fmt.Errorf("error writing to file: %v", err)
 	}
@@ -119,6 +132,27 @@ func scrapeAndExtractLinks(pageURL string) ([]string, error) {
 	})
 
 	return links, nil
+}
+
+func removeBlankLines(text string) string {
+	var result strings.Builder
+	lines := strings.Split(text, "\n")
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" {
+			if result.Len() > 0 {
+				result.WriteString("\n")
+			}
+			result.WriteString(trimmed)
+		}
+	}
+	return result.String()
+}
+
+// Function to remove extra spaces
+func removeExtraSpaces(text string) string {
+	words := strings.Fields(text)
+	return strings.Join(words, " ")
 }
 
 func sanitizeFilename(url string) string {
