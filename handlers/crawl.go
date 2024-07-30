@@ -1,7 +1,8 @@
 package handlers
 
 import (
-	"WebScraper/functions"
+	"WebScraper/models"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -15,14 +16,20 @@ func StartCrawlHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	urls, err := functions.Read_json_urls("urls.json")
-	if err != nil {
-		http.Error(w, "Failed to read URLs: "+err.Error(), http.StatusInternalServerError)
+	var requestData models.URLDatastruct // Use the model from the models package
+
+	// Decode the JSON request body
+	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
 
-	for _, url := range urls {
-		go Crawl(url) // Start crawling URLs in the background
+	// Close the request body
+	defer r.Body.Close()
+
+	// Process each URL
+	for _, url := range requestData.URLs {
+		go Crawl(url) // Run crawling in a goroutine
 	}
 
 	w.WriteHeader(http.StatusOK)
