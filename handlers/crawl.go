@@ -6,9 +6,14 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 )
 
-var visited = make(map[string]bool)
+var (
+	visited   = make(map[string]bool)
+	visitLock sync.Mutex
+	wg        sync.WaitGroup
+)
 
 func StartCrawlHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -16,7 +21,7 @@ func StartCrawlHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var requestData models.URLDatastruct // Use the model from the models package
+	var requestData models.URLDatastruct // getting the model from the models package
 
 	// Decode the JSON request body
 	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
@@ -24,13 +29,22 @@ func StartCrawlHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Close the request body
+	// Closing the request body, it's a must
 	defer r.Body.Close()
 
 	// Process each URL
 	for _, url := range requestData.URLs {
-		go Crawl(url) // Run crawling in a goroutine
+		wg.Add(1)
+		go func(url string) {
+			defer wg.Done()
+			Crawl(url) // Using go routine it runs crawling through the sites
+		}(url)
 	}
+
+	go func() {
+		wg.Wait()
+		fmt.Println("Crawling completed.")
+	}()
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Crawling started"))
@@ -43,12 +57,16 @@ func Crawl(baseURL string) {
 	for len(toVisit) > 0 {
 		url := toVisit[0]
 		toVisit = toVisit[1:]
+
+		visitLock.Lock()
 		if visited[url] {
+			visitLock.Unlock()
 			continue
 		}
+		visited[url] = true
+		visitLock.Unlock()
 
 		fmt.Println("Fetching:", url)
-		visited[url] = true
 
 		links, err := ScrapeAndExtractLinks(url)
 		if err != nil {
@@ -57,9 +75,11 @@ func Crawl(baseURL string) {
 		}
 
 		for _, link := range links {
+			visitLock.Lock()
 			if !visited[link] {
 				toVisit = append(toVisit, link)
 			}
+			visitLock.Unlock()
 		}
 	}
 }
