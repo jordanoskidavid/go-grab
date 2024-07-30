@@ -1,19 +1,17 @@
 package main
 
 import (
-	"WebScraper/functions"
 	"WebScraper/handlers"
 	"fmt"
+	"log"
+	"net/http"
 )
 
 func main() {
-	urls, err := functions.Read_json_urls("urls.json")
-	if err != nil {
-		fmt.Println("The reading can not be done:", err)
-		return
-	}
-	for _, url := range urls {
-		handlers.Crawl(url) // Crawling the URL
-	}
-	fmt.Println("Crawling completed.")
+	// Set up routes and handlers
+	http.HandleFunc("/crawl", handlers.StartCrawlHandler)
+	http.HandleFunc("/scraped-data", handlers.GetScrapedDataHandler)
+
+	fmt.Println("Server started at :8080")
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }

@@ -1,11 +1,33 @@
 package handlers
 
 import (
+	"WebScraper/functions"
 	"fmt"
 	"log"
+	"net/http"
 )
 
 var visited = make(map[string]bool)
+
+func StartCrawlHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	urls, err := functions.Read_json_urls("urls.json")
+	if err != nil {
+		http.Error(w, "Failed to read URLs: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	for _, url := range urls {
+		go Crawl(url) // Start crawling URLs in the background
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Crawling started"))
+}
 
 // Crawl function to check all the "visited" pages
 func Crawl(baseURL string) {
