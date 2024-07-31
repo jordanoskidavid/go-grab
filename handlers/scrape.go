@@ -101,7 +101,6 @@ func ScrapeAndExtractLinks(pageURL string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error parsing base URL %s: %v", pageURL, err)
 	}
-
 	doc.Find("a[href]").Each(func(i int, s *goquery.Selection) {
 		link, exists := s.Attr("href")
 		if exists {

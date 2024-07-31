@@ -10,8 +10,7 @@ import (
 func main() {
 	// Set up routes and handlers
 	http.HandleFunc("/crawl", handlers.StartCrawlHandler)
-	http.HandleFunc("/scraped-data", handlers.GetScrapedDataHandler)
-
+	http.HandleFunc("/scraped-data", handlers.GetScrapedDataHandler) //da se sredi
 	fmt.Println("Server started at :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
