@@ -32,22 +32,45 @@ func StartCrawlHandler(w http.ResponseWriter, r *http.Request) {
 	// Closing the request body, it's a must
 	defer r.Body.Close()
 
-	// Process each URL
-	for _, url := range requestData.URLs {
-		wg.Add(1)
-		go func(url string) {
-			defer wg.Done()
-			Crawl(url) // Using go routine it runs crawling through the sites
-		}(url)
-	}
+	jobs := make(chan string, len(requestData.URLs))
+	results := make(chan struct{}, len(requestData.URLs))
 
+	// Start a single worker to process URLs sequentially
+	wg.Add(1)
+	go worker(1, jobs, results)
+
+	// Send URLs to the jobs channel sequentially
+	go func() {
+		defer close(jobs)
+		for _, url := range requestData.URLs {
+			jobs <- url
+		}
+	}()
+
+	// Waiting for all work to be done
 	go func() {
 		wg.Wait()
+		close(results)
 		fmt.Println("Crawling completed.")
 	}()
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Crawling started"))
+}
+
+func worker(id int, jobs <-chan string, results chan<- struct{}) {
+	defer wg.Done()
+	for url := range jobs {
+		func(url string) {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("Worker %d: Recovered from panic while processing %s: %v", id, url, r)
+				}
+			}()
+			Crawl(url) // Process the URL fully before moving to the next
+			results <- struct{}{}
+		}(url)
+	}
 }
 
 // Crawl function to check all the "visited" pages
@@ -70,6 +93,7 @@ func Crawl(baseURL string) {
 
 		links, err := ScrapeAndExtractLinks(url)
 		if err != nil {
+			// Log the error but continue processing this URL fully
 			log.Printf("Error scraping %s: %v\n", url, err)
 			continue
 		}
