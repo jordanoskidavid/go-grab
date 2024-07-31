@@ -21,7 +21,7 @@ func StartCrawlHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var requestData models.URLDatastruct // getting the model from the models package
+	var requestData models.URLDatastruct
 
 	// Decode the JSON request body
 	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
@@ -35,11 +35,11 @@ func StartCrawlHandler(w http.ResponseWriter, r *http.Request) {
 	jobs := make(chan string, len(requestData.URLs))
 	results := make(chan struct{}, len(requestData.URLs))
 
-	// Start a single worker to process URLs sequentially
+	// Starting a single worker to process URLs sequentially
 	wg.Add(1)
 	go worker(1, jobs, results)
 
-	// Send URLs to the jobs channel sequentially
+	// Sending URLs to the jobs channel sequentiallly
 	go func() {
 		defer close(jobs)
 		for _, url := range requestData.URLs {
@@ -47,7 +47,6 @@ func StartCrawlHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	// Waiting for all work to be done
 	go func() {
 		wg.Wait()
 		close(results)
@@ -67,7 +66,7 @@ func worker(id int, jobs <-chan string, results chan<- struct{}) {
 					log.Printf("Worker %d: Recovered from panic while processing %s: %v", id, url, r)
 				}
 			}()
-			Crawl(url) // Process the URL fully before moving to the next
+			Crawl(url) //Proccesing the url until goint to the next
 			results <- struct{}{}
 		}(url)
 	}
