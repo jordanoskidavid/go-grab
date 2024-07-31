@@ -72,7 +72,7 @@ func worker(id int, jobs <-chan string, results chan<- struct{}) {
 	}
 }
 
-// Crawl function to check all the "visited" pages
+// Crawl function to check all the "visited" page
 func Crawl(baseURL string) {
 	toVisit := []string{baseURL}
 
