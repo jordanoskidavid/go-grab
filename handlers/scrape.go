@@ -3,6 +3,8 @@ package handlers
 import (
 	"WebScraper/models"
 	"WebScraper/utils"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -58,17 +60,19 @@ func ScrapeAndExtractLinks(pageURL string) ([]string, error) {
 		return nil, fmt.Errorf("error loading HTML from URL %s: %v", pageURL, err)
 	}
 
+	// Remove unwanted elements like style, script, etc.
 	doc.Find("style, script, .jquery-script").Remove()
 
 	var textContent strings.Builder
 	lastWasSpace := true
 
-	filterNonText := func(i int, s *goquery.Selection) bool {
+	// Filter for main content areas only
+	filterMainContent := func(i int, s *goquery.Selection) bool {
 		tagName := strings.ToLower(s.Get(0).Data)
 		return tagName == "p" || tagName == "div" || tagName == "span" || tagName == "a"
 	}
 
-	doc.Find("body *").FilterFunction(filterNonText).Each(func(i int, s *goquery.Selection) {
+	doc.Find("body *").FilterFunction(filterMainContent).Each(func(i int, s *goquery.Selection) {
 		text := strings.TrimSpace(s.Text())
 		if text != "" {
 			text = strings.ReplaceAll(text, "\t", " ")
@@ -94,6 +98,10 @@ func ScrapeAndExtractLinks(pageURL string) ([]string, error) {
 		URL:     pageURL,
 		Content: finalText,
 	}
+
+	// Add more logging to inspect content and deduplication process
+	fmt.Printf("Scraped content for URL: %s\n", page.URL)
+	fmt.Printf("Content hash: %s\n", hashContent(page.Content))
 
 	err = savePageToFile(page)
 	if err != nil {
@@ -142,7 +150,17 @@ func savePageToFile(page models.PageData) error {
 		}
 	}
 
-	// Append new page data
+	// Deduplication: Check for duplicate content before saving
+	contentHash := hashContent(page.Content)
+	fmt.Printf("Checking for duplicate content hash: %s\n", contentHash)
+	for _, p := range pages {
+		if hashContent(p.Content) == contentHash {
+			fmt.Printf("Duplicate content detected for URL %s, skipping save.\n", page.URL)
+			return nil
+		}
+	}
+
+	// Append new page data only if not duplicate
 	pages = append(pages, page)
 
 	// Write updated data back to the file
@@ -151,13 +169,8 @@ func savePageToFile(page models.PageData) error {
 		return fmt.Errorf("error marshalling JSON: %v", err)
 	}
 
-	file, err := os.Create(filePath)
-	if err != nil {
-		return fmt.Errorf("error creating file: %v", err)
-	}
-	defer file.Close()
-
-	_, err = file.Write(jsonData)
+	// Overwrite the file with the new content
+	err = os.WriteFile(filePath, jsonData, 0644)
 	if err != nil {
 		return fmt.Errorf("error writing to file: %v", err)
 	}
@@ -197,4 +210,11 @@ func sanitizeFileName(urlStr string) string {
 		fileName = "default"
 	}
 	return fileName
+}
+
+// hashContent generates a hash for the given content to help with deduplication.
+func hashContent(content string) string {
+	h := sha256.New()
+	h.Write([]byte(content))
+	return hex.EncodeToString(h.Sum(nil))
 }
