@@ -1,4 +1,4 @@
-# Go Web Scraper
+# GoGrab
 
 ## Description
 
