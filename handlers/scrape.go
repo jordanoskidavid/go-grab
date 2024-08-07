@@ -19,6 +19,7 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
+// GetScrapedDataHandler serves the scraped data from a file.
 func GetScrapedDataHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
@@ -40,18 +41,36 @@ func GetScrapedDataHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+// ScrapeAndExtractLinks scrapes content from the given URL and extracts links.
 func ScrapeAndExtractLinks(pageURL string) ([]string, error) {
-	// Create a context with a timeout to manage the Chrome session
+	// Parse the base URL to extract the hostname
+	base, err := url.Parse(pageURL)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing base URL %s: %v", pageURL, err)
+	}
+	baseHost := base.Hostname()
+
+	resp, err := http.Get(pageURL)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching URL %s: %v", pageURL, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code %d for URL %s", resp.StatusCode, pageURL)
+	}
+	// Create a new Chrome context with a timeout
 	ctx, cancel := chromedp.NewContext(context.Background())
 	defer cancel()
 
+	// Set a timeout for the context
 	ctx, cancel = context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
 	var htmlContent string
 
 	// Run the chromedp tasks to navigate and fetch the rendered HTML
-	err := chromedp.Run(ctx,
+	err = chromedp.Run(ctx,
 		chromedp.Navigate(pageURL),
 		chromedp.WaitReady("body"),
 		chromedp.OuterHTML("html", &htmlContent),
@@ -66,8 +85,10 @@ func ScrapeAndExtractLinks(pageURL string) ([]string, error) {
 		return nil, fmt.Errorf("error loading HTML for URL %s: %v", pageURL, err)
 	}
 
+	// Clean up the document by removing script and style elements
 	doc.Find("style, script, .jquery-script").Remove()
 
+	// Extract and clean text content
 	var textContent strings.Builder
 	lastWasSpace := true
 
@@ -89,9 +110,12 @@ func ScrapeAndExtractLinks(pageURL string) ([]string, error) {
 			lastWasSpace = true
 		}
 	})
+
 	finalText := strings.TrimSpace(textContent.String())
 	finalText = utils.RemoveBlankLines(finalText)
 	finalText = utils.RemoveExtraSpaces(finalText)
+
+	// Save the page content to a file
 	pageTitle := doc.Find("title").Text()
 	page := models.PageData{
 		Title:   pageTitle,
@@ -103,21 +127,37 @@ func ScrapeAndExtractLinks(pageURL string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	var links []string
-	base, err := url.Parse(pageURL)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing base URL %s: %v", pageURL, err)
-	}
+
+	// Extract and filter links
 	doc.Find("a[href]").Each(func(i int, s *goquery.Selection) {
 		link, exists := s.Attr("href")
 		if exists {
+			// Resolve the link to its absolute URL
 			absLink := base.ResolveReference(&url.URL{Path: link}).String()
-			links = append(links, absLink)
+
+			// Normalize and clean up URLs
+			absLink = strings.TrimSpace(absLink)
+			if !strings.HasPrefix(absLink, "http") {
+				return // Skip non-HTTP links
+			}
+
+			// Parse the resolved link
+			parsedLink, err := url.Parse(absLink)
+			if err == nil {
+				// Ensure the link is internal and properly formatted
+				if parsedLink.Hostname() == baseHost {
+					links = append(links, absLink)
+				}
+			}
 		}
 	})
+
 	return links, nil
 }
 
+// savePageToFile saves or appends page data to a JSON file named after the base URL.
 func savePageToFile(page models.PageData) error {
 	baseURL, err := getBaseURL(page.URL)
 	if err != nil {
@@ -126,6 +166,7 @@ func savePageToFile(page models.PageData) error {
 	fileName := sanitizeFileName(baseURL) + ".json"
 	filePath := filepath.Join(".", fileName)
 	var pages []models.PageData
+	// Check if file exists and read existing data
 	if _, err := os.Stat(filePath); err == nil {
 		file, err := os.Open(filePath)
 		if err != nil {
@@ -138,8 +179,10 @@ func savePageToFile(page models.PageData) error {
 		}
 	}
 
+	// Append new page data
 	pages = append(pages, page)
 
+	// Write updated data back to the file
 	jsonData, err := json.MarshalIndent(pages, "", "    ")
 	if err != nil {
 		return fmt.Errorf("error marshalling JSON: %v", err)
@@ -163,21 +206,25 @@ func savePageToFile(page models.PageData) error {
 	return nil
 }
 
+// getBaseURL extracts the base URL from a given URL.
 func getBaseURL(urlStr string) (string, error) {
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
 		return "", fmt.Errorf("error parsing URL: %v", err)
 	}
+	// Construct the base URL
 	baseURL := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
 	return baseURL, nil
 }
 
+// sanitizeFileName sanitizes a URL to create a valid filename.
 func sanitizeFileName(urlStr string) string {
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
 		log.Printf("error parsing URL: %v", err)
 		return "invalid_url"
 	}
+	// Create a valid file name from the URL
 	fileName := parsedURL.Hostname()
 	if len(fileName) == 0 {
 		fileName = "default"
