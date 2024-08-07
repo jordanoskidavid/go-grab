@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/PuerkitoBio/goquery"
+	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp"
 )
 
@@ -40,124 +40,87 @@ func GetScrapedDataHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write(data)
 }
-
-// ScrapeAndExtractLinks scrapes content from the given URL and extracts links.
 func ScrapeAndExtractLinks(pageURL string) ([]string, error) {
-	// Parse the base URL to extract the hostname
+	// Create a new Chrome context with a timeout
+	ctx, cancel := chromedp.NewContext(context.Background())
+	defer cancel()
+
+	// Set a timeout for the context
+	ctx, cancel = context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+
+	var htmlContent string
+	var pageTitle string
+
+	// Set blocked URLs and run the chromedp tasks to navigate and fetch the rendered HTML and title
+	err := chromedp.Run(ctx,
+		network.SetBlockedURLS([]string{"*.jpg", "*.png", "*.gif", "*.css", "*.svg"}), // Block specific resources
+		chromedp.Navigate(pageURL),
+		chromedp.WaitReady("body", chromedp.ByQuery),
+		chromedp.OuterHTML("html", &htmlContent),
+		chromedp.Title(&pageTitle),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error rendering dynamic content from %s: %v", pageURL, err)
+	}
+
+	// Extract human-readable text using chromedp
+	var textContent string
+	err = chromedp.Run(ctx,
+		chromedp.Text("body", &textContent, chromedp.NodeVisible),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error extracting text from %s: %v", pageURL, err)
+	}
+
+	// Clean and format the text content
+	finalText := strings.TrimSpace(textContent)
+	finalText = utils.RemoveBlankLines(finalText)
+	finalText = utils.RemoveExtraSpaces(finalText)
+
+	// Save the page content to a file
+	pageData := models.PageData{
+		Title:   pageTitle,
+		URL:     pageURL,
+		Content: finalText,
+	}
+
+	err = savePageToFile(pageData)
+	if err != nil {
+		return nil, err
+	}
+
+	// Extract and filter links
+	var links []string
+	err = chromedp.Run(ctx,
+		chromedp.Evaluate(`Array.from(document.querySelectorAll('a')).map(a => a.href).filter(href => href.startsWith('http'))`, &links),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error extracting links from %s: %v", pageURL, err)
+	}
+
+	// Filter out external links
 	base, err := url.Parse(pageURL)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing base URL %s: %v", pageURL, err)
 	}
 	baseHost := base.Hostname()
 
-	resp, err := http.Get(pageURL)
-	if err != nil {
-		return nil, fmt.Errorf("error fetching URL %s: %v", pageURL, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code %d for URL %s", resp.StatusCode, pageURL)
-	}
-	// Create a new Chrome context with a timeout
-	ctx, cancel := chromedp.NewContext(context.Background())
-	defer cancel()
-
-	// Set a timeout for the context
-	ctx, cancel = context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-
-	var htmlContent string
-
-	// Run the chromedp tasks to navigate and fetch the rendered HTML
-	err = chromedp.Run(ctx,
-		chromedp.Navigate(pageURL),
-		chromedp.WaitReady("body"),
-		chromedp.OuterHTML("html", &htmlContent),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error rendering dynamic content from %s: %v", pageURL, err)
-	}
-
-	// Use goquery to parse the fetched HTML content
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
-	if err != nil {
-		return nil, fmt.Errorf("error loading HTML for URL %s: %v", pageURL, err)
-	}
-
-	// Clean up the document by removing script and style elements
-	doc.Find("style, script, .jquery-script").Remove()
-
-	// Extract and clean text content
-	var textContent strings.Builder
-	lastWasSpace := true
-
-	filterNonText := func(i int, s *goquery.Selection) bool {
-		tagName := strings.ToLower(s.Get(0).Data)
-		return tagName == "p" || tagName == "div" || tagName == "span" || tagName == "a"
-	}
-
-	doc.Find("body *").FilterFunction(filterNonText).Each(func(i int, s *goquery.Selection) {
-		text := strings.TrimSpace(s.Text())
-		if text != "" {
-			text = strings.ReplaceAll(text, "\t", " ")
-			if !lastWasSpace && textContent.Len() > 0 {
-				textContent.WriteString(" ")
-			}
-			textContent.WriteString(text)
-			lastWasSpace = false
-		} else {
-			lastWasSpace = true
+	var internalLinks []string
+	for _, link := range links {
+		parsedLink, err := url.Parse(link)
+		if err != nil {
+			continue
 		}
-	})
-
-	finalText := strings.TrimSpace(textContent.String())
-	finalText = utils.RemoveBlankLines(finalText)
-	finalText = utils.RemoveExtraSpaces(finalText)
-
-	// Save the page content to a file
-	pageTitle := doc.Find("title").Text()
-	page := models.PageData{
-		Title:   pageTitle,
-		URL:     pageURL,
-		Content: finalText,
-	}
-
-	err = savePageToFile(page)
-	if err != nil {
-		return nil, err
-	}
-
-	var links []string
-
-	// Extract and filter links
-	doc.Find("a[href]").Each(func(i int, s *goquery.Selection) {
-		link, exists := s.Attr("href")
-		if exists {
-			// Resolve the link to its absolute URL
-			absLink := base.ResolveReference(&url.URL{Path: link}).String()
-
-			// Normalize and clean up URLs
-			absLink = strings.TrimSpace(absLink)
-			if !strings.HasPrefix(absLink, "http") {
-				return // Skip non-HTTP links
-			}
-
-			// Parse the resolved link
-			parsedLink, err := url.Parse(absLink)
-			if err == nil {
-				// Ensure the link is internal and properly formatted
-				if parsedLink.Hostname() == baseHost {
-					links = append(links, absLink)
-				}
-			}
+		if parsedLink.Hostname() == baseHost {
+			internalLinks = append(internalLinks, link)
 		}
-	})
+	}
 
-	return links, nil
+	return internalLinks, nil
 }
 
-// savePageToFile saves or appends page data to a JSON file named after the base URL.
+// savePageToFile saves the page content to a file named after the base URL.
 func savePageToFile(page models.PageData) error {
 	baseURL, err := getBaseURL(page.URL)
 	if err != nil {
