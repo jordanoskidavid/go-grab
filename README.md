@@ -7,4 +7,4 @@ A simple web scraper built with Go. It extracts titles, URLs, and content from w
 ## Requirements
 
 - Go (version 1.22 or higher) - [Install Go](https://golang.org/doc/install)
-- Playwright - [Install Playwright](https://playwright.dev/docs/intro) (for handling dynamic content)
+- Chromedp - [Install Chromedp](https://github.com/chromedp/chromedp) (for handling dynamic content)
