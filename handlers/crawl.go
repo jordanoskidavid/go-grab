@@ -13,10 +13,12 @@ import (
 var (
 	visited   = make(map[string]bool)
 	visitLock sync.Mutex
-	wg        sync.WaitGroup
 )
 
 func StartCrawlHandler(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Crawling started"))
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
@@ -30,45 +32,12 @@ func StartCrawlHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	jobs := make(chan string, len(requestData.URLs))
-	results := make(chan struct{}, len(requestData.URLs))
-
-	numWorkers := 5 // Adjust this number based on your needs
-	for i := 0; i < numWorkers; i++ {
-		wg.Add(1)
-		go worker(i, jobs, results)
+	for _, url := range requestData.URLs {
+		Crawl(url)
 	}
-
-	go func() {
-		defer close(jobs)
-		for _, url := range requestData.URLs {
-			jobs <- url
-		}
-	}()
-
-	go func() {
-		wg.Wait()
-		close(results)
-		fmt.Println("Crawling completed.")
-	}()
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Crawling started"))
-}
-
-func worker(id int, jobs <-chan string, results chan<- struct{}) {
-	defer wg.Done()
-	for url := range jobs {
-		func(url string) {
-			defer func() {
-				if r := recover(); r != nil {
-					log.Printf("Worker %d: Recovered from panic while processing %s: %v", id, url, r)
-				}
-			}()
-			Crawl(url)
-			results <- struct{}{}
-		}(url)
-	}
+	w.Write([]byte("Crawling completed"))
 }
 
 func Crawl(baseURL string) {
@@ -78,7 +47,6 @@ func Crawl(baseURL string) {
 		url := toVisit[0]
 		toVisit = toVisit[1:]
 
-		// Normalize URL before checking and updating the visited map
 		normalizedURL := utils.NormalizeURL(url)
 
 		visitLock.Lock()

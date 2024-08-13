@@ -15,7 +15,6 @@ func NormalizeURL(urlStr string) string {
 	return u.String()
 }
 
-// Filter functions for removing the blank and extra spaces, all to be tidy and clean
 func RemoveBlankLines(text string) string {
 	var result strings.Builder
 	lines := strings.Split(text, "\n")
