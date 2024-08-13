@@ -1,8 +1,19 @@
 package utils
 
 import (
+	"net/url"
 	"strings"
 )
+
+func NormalizeURL(urlStr string) string {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return urlStr
+	}
+	path := strings.TrimRight(u.Path, "/")
+	u.Path = path
+	return u.String()
+}
 
 // Filter functions for removing the blank and extra spaces, all to be tidy and clean
 func RemoveBlankLines(text string) string {

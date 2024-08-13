@@ -2,12 +2,11 @@ package handlers
 
 import (
 	"WebScraper/models"
+	"WebScraper/utils"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"net/url"
-	"strings"
 	"sync"
 )
 
@@ -72,15 +71,6 @@ func worker(id int, jobs <-chan string, results chan<- struct{}) {
 	}
 }
 
-func normalizeURL(urlStr string) string {
-	u, err := url.Parse(urlStr)
-	if err != nil {
-		return urlStr
-	}
-	path := strings.TrimRight(u.Path, "/")
-	u.Path = path
-	return u.String()
-}
 func Crawl(baseURL string) {
 	toVisit := []string{baseURL}
 
@@ -89,7 +79,7 @@ func Crawl(baseURL string) {
 		toVisit = toVisit[1:]
 
 		// Normalize URL before checking and updating the visited map
-		normalizedURL := normalizeURL(url)
+		normalizedURL := utils.NormalizeURL(url)
 
 		visitLock.Lock()
 		if visited[normalizedURL] {
@@ -108,7 +98,7 @@ func Crawl(baseURL string) {
 		}
 
 		for _, link := range links {
-			normalizedLink := normalizeURL(link)
+			normalizedLink := utils.NormalizeURL(link)
 			visitLock.Lock()
 			if !visited[normalizedLink] {
 				toVisit = append(toVisit, link)
