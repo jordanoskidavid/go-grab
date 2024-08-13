@@ -56,7 +56,7 @@ func ScrapeAndExtractLinks(pageURL string) ([]string, error) {
 	err := chromedp.Run(ctx,
 		network.SetBlockedURLS([]string{"*.jpg", "*.png", "*.gif", "*.css", "*.svg", "*.js"}),
 		chromedp.Navigate(pageURL),
-		chromedp.WaitVisible("body", chromedp.ByQuery), // Adjust selector as needed
+		chromedp.WaitVisible("body", chromedp.ByQuery),
 		chromedp.Title(&pageTitle),
 		chromedp.Evaluate(`document.body.innerText`, &textContent),
 	)
@@ -64,12 +64,10 @@ func ScrapeAndExtractLinks(pageURL string) ([]string, error) {
 		return nil, fmt.Errorf("error rendering dynamic content from %s: %v", pageURL, err)
 	}
 
-	// Clean and format the text content
 	finalText := strings.TrimSpace(textContent)
 	finalText = utils.RemoveBlankLines(finalText)
 	finalText = utils.RemoveExtraSpaces(finalText)
 
-	// Save the page content to a file
 	pageData := models.PageData{
 		Title:   pageTitle,
 		URL:     pageURL,
@@ -80,7 +78,6 @@ func ScrapeAndExtractLinks(pageURL string) ([]string, error) {
 		return nil, err
 	}
 
-	// Extract and filter links
 	var links []string
 	err = chromedp.Run(ctx,
 		chromedp.Evaluate(`Array.from(document.querySelectorAll('a[href^="http"]')).map(a => a.href)`, &links),
@@ -89,7 +86,6 @@ func ScrapeAndExtractLinks(pageURL string) ([]string, error) {
 		return nil, fmt.Errorf("error extracting links from %s: %v", pageURL, err)
 	}
 
-	// Filter out external links
 	base, err := url.Parse(pageURL)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing base URL %s: %v", pageURL, err)
