@@ -23,23 +23,21 @@ func StartCrawlHandler(w http.ResponseWriter, r *http.Request) {
 
 	var requestData models.URLDatastruct
 
-	// Decode the JSON request body
 	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
-
-	// Closing the request body, it's a must
 	defer r.Body.Close()
 
 	jobs := make(chan string, len(requestData.URLs))
 	results := make(chan struct{}, len(requestData.URLs))
 
-	// Starting a single worker to process URLs sequentially
-	wg.Add(1)
-	go worker(1, jobs, results)
+	numWorkers := 5 // Adjust this number based on your needs
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+		go worker(i, jobs, results)
+	}
 
-	// Sending URLs to the jobs channel sequentiallly
 	go func() {
 		defer close(jobs)
 		for _, url := range requestData.URLs {
@@ -66,13 +64,12 @@ func worker(id int, jobs <-chan string, results chan<- struct{}) {
 					log.Printf("Worker %d: Recovered from panic while processing %s: %v", id, url, r)
 				}
 			}()
-			Crawl(url) //Proccesing the url until goint to the next
+			Crawl(url)
 			results <- struct{}{}
 		}(url)
 	}
 }
 
-// Crawl function to check all the "visited" page
 func Crawl(baseURL string) {
 	toVisit := []string{baseURL}
 
@@ -88,14 +85,15 @@ func Crawl(baseURL string) {
 		visited[url] = true
 		visitLock.Unlock()
 
-		fmt.Println("Fetching:", url)
+		fmt.Printf("Fetching: %s\n", url)
 
 		links, err := ScrapeAndExtractLinks(url)
 		if err != nil {
-			// Log the error but continue processing this URL fully
 			log.Printf("Error scraping %s: %v\n", url, err)
 			continue
 		}
+
+		fmt.Printf("Found %d links on %s\n", len(links), url)
 
 		for _, link := range links {
 			visitLock.Lock()

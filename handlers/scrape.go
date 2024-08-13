@@ -19,58 +19,49 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
-// GetScrapedDataHandler serves the scraped data from a file.
 func GetScrapedDataHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
+
 	file, err := os.Open("scraped_data.json")
 	if err != nil {
 		http.Error(w, "Failed to open scraped data file: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	defer file.Close()
+
 	data, err := io.ReadAll(file)
 	if err != nil {
 		http.Error(w, "Failed to read scraped data file: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(data)
 }
+
 func ScrapeAndExtractLinks(pageURL string) ([]string, error) {
-	// Create a new Chrome context with a timeout
 	ctx, cancel := chromedp.NewContext(context.Background())
 	defer cancel()
 
 	// Set a timeout for the context
-	ctx, cancel = context.WithTimeout(ctx, 2*time.Minute)
+	ctx, cancel = context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
 
-	var htmlContent string
-	var pageTitle string
+	var pageTitle, textContent string
 
-	// Set blocked URLs and run the chromedp tasks to navigate and fetch the rendered HTML and title
 	err := chromedp.Run(ctx,
-		network.SetBlockedURLS([]string{"*.jpg", "*.png", "*.gif", "*.css", "*.svg"}), // Block specific resources
+		network.SetBlockedURLS([]string{"*.jpg", "*.png", "*.gif", "*.css", "*.svg", "*.js"}),
 		chromedp.Navigate(pageURL),
-		chromedp.WaitReady("body", chromedp.ByQuery),
-		chromedp.OuterHTML("html", &htmlContent),
+		chromedp.WaitVisible("body", chromedp.ByQuery), // Adjust selector as needed
 		chromedp.Title(&pageTitle),
+		chromedp.Evaluate(`document.body.innerText`, &textContent),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error rendering dynamic content from %s: %v", pageURL, err)
-	}
-
-	// Extract human-readable text using chromedp
-	var textContent string
-	err = chromedp.Run(ctx,
-		chromedp.Text("body", &textContent, chromedp.NodeVisible),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error extracting text from %s: %v", pageURL, err)
 	}
 
 	// Clean and format the text content
@@ -85,15 +76,14 @@ func ScrapeAndExtractLinks(pageURL string) ([]string, error) {
 		Content: finalText,
 	}
 
-	err = savePageToFile(pageData)
-	if err != nil {
+	if err := savePageToFile(pageData); err != nil {
 		return nil, err
 	}
 
 	// Extract and filter links
 	var links []string
 	err = chromedp.Run(ctx,
-		chromedp.Evaluate(`Array.from(document.querySelectorAll('a')).map(a => a.href).filter(href => href.startsWith('http'))`, &links),
+		chromedp.Evaluate(`Array.from(document.querySelectorAll('a[href^="http"]')).map(a => a.href)`, &links),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error extracting links from %s: %v", pageURL, err)
@@ -120,7 +110,6 @@ func ScrapeAndExtractLinks(pageURL string) ([]string, error) {
 	return internalLinks, nil
 }
 
-// savePageToFile saves the page content to a file named after the base URL.
 func savePageToFile(page models.PageData) error {
 	baseURL, err := getBaseURL(page.URL)
 	if err != nil {
@@ -128,39 +117,30 @@ func savePageToFile(page models.PageData) error {
 	}
 	fileName := sanitizeFileName(baseURL) + ".json"
 	filePath := filepath.Join(".", fileName)
-	var pages []models.PageData
-	// Check if file exists and read existing data
-	if _, err := os.Stat(filePath); err == nil {
-		file, err := os.Open(filePath)
-		if err != nil {
-			return fmt.Errorf("error opening file: %v", err)
-		}
-		defer file.Close()
-		decoder := json.NewDecoder(file)
-		if err := decoder.Decode(&pages); err != nil && err != io.EOF {
-			return fmt.Errorf("error decoding JSON: %v", err)
-		}
-	}
 
-	// Append new page data
-	pages = append(pages, page)
-
-	// Write updated data back to the file
-	jsonData, err := json.MarshalIndent(pages, "", "    ")
+	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
-		return fmt.Errorf("error marshalling JSON: %v", err)
-	}
-
-	file, err := os.Create(filePath)
-	if err != nil {
-		return fmt.Errorf("error creating file: %v", err)
+		return fmt.Errorf("error opening file: %v", err)
 	}
 	defer file.Close()
 
-	_, err = file.Write(jsonData)
-	if err != nil {
-		return fmt.Errorf("error writing to file: %v", err)
+	var pages []models.PageData
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(&pages); err != nil && err != io.EOF {
+		return fmt.Errorf("error decoding JSON: %v", err)
 	}
+
+	pages = append(pages, page)
+
+	file.Truncate(0)
+	file.Seek(0, 0)
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "    ")
+	if err := encoder.Encode(pages); err != nil {
+		return fmt.Errorf("error encoding JSON: %v", err)
+	}
+
 	absPath, err := filepath.Abs(filePath)
 	if err != nil {
 		return fmt.Errorf("error getting absolute path: %v", err)
@@ -169,25 +149,20 @@ func savePageToFile(page models.PageData) error {
 	return nil
 }
 
-// getBaseURL extracts the base URL from a given URL.
 func getBaseURL(urlStr string) (string, error) {
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
 		return "", fmt.Errorf("error parsing URL: %v", err)
 	}
-	// Construct the base URL
-	baseURL := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
-	return baseURL, nil
+	return fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host), nil
 }
 
-// sanitizeFileName sanitizes a URL to create a valid filename.
 func sanitizeFileName(urlStr string) string {
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
 		log.Printf("error parsing URL: %v", err)
 		return "invalid_url"
 	}
-	// Create a valid file name from the URL
 	fileName := parsedURL.Hostname()
 	if len(fileName) == 0 {
 		fileName = "default"
