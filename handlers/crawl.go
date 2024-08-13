@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 )
 
 var (
@@ -46,6 +47,8 @@ func Crawl(baseURL string) {
 	for len(toVisit) > 0 {
 		url := toVisit[0]
 		toVisit = toVisit[1:]
+
+		time.Sleep(2 * time.Second) // Rate limiting to make delay between requests to slow down the crawling process because of the riskt of beign blocked
 
 		normalizedURL := utils.NormalizeURL(url)
 
