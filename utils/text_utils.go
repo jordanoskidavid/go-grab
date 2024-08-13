@@ -1,6 +1,8 @@
 package utils
 
-import "strings"
+import (
+	"strings"
+)
 
 // Filter functions for removing the blank and extra spaces, all to be tidy and clean
 func RemoveBlankLines(text string) string {
@@ -21,4 +23,18 @@ func RemoveBlankLines(text string) string {
 func RemoveExtraSpaces(text string) string {
 	words := strings.Fields(text)
 	return strings.Join(words, " ")
+}
+
+func FormatTextContent(text string) string {
+	words := strings.Fields(text)
+	var formattedText strings.Builder
+	for i, word := range words {
+		formattedText.WriteString(word)
+		if (i+1)%10 == 0 {
+			formattedText.WriteString(".\n") // End the sentence and start a new line
+		} else {
+			formattedText.WriteString(" ")
+		}
+	}
+	return strings.TrimSpace(formattedText.String()) // Remove any trailing space
 }
