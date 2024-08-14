@@ -38,7 +38,6 @@ func GetScrapedDataHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		defer file.Close()
 
-		// Copy the file's content to the zip archive
 		_, err = io.Copy(fileInZip, file)
 		return err
 	})
