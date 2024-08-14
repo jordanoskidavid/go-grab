@@ -1,19 +1,10 @@
 package handlers
 
 import (
+	"WebScraper/functions"
 	"WebScraper/models"
-	"WebScraper/utils"
 	"encoding/json"
-	"fmt"
-	"log"
 	"net/http"
-	"sync"
-	"time"
-)
-
-var (
-	visited   = make(map[string]bool)
-	visitLock sync.Mutex
 )
 
 func StartCrawlHandler(w http.ResponseWriter, r *http.Request) {
@@ -34,47 +25,9 @@ func StartCrawlHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	for _, url := range requestData.URLs {
-		Crawl(url)
+		functions.Crawl(url)
 	}
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Crawling completed"))
-}
-
-func Crawl(baseURL string) {
-	toVisit := []string{baseURL}
-
-	for len(toVisit) > 0 {
-		url := toVisit[0]
-		toVisit = toVisit[1:]
-
-		time.Sleep(2 * time.Second) // Rate limiting to make delay between requests to slow down the crawling process because of the riskt of beign blocked
-
-		normalizedURL := utils.NormalizeURL(url)
-
-		visitLock.Lock()
-		if visited[normalizedURL] {
-			visitLock.Unlock()
-			continue
-		}
-		visited[normalizedURL] = true
-		visitLock.Unlock()
-
-		fmt.Println("Fetching:", url)
-
-		links, err := ScrapeAndExtractLinks(url)
-		if err != nil {
-			log.Printf("Error scraping %s: %v\n", url, err)
-			continue
-		}
-
-		for _, link := range links {
-			normalizedLink := utils.NormalizeURL(link)
-			visitLock.Lock()
-			if !visited[normalizedLink] {
-				toVisit = append(toVisit, link)
-			}
-			visitLock.Unlock()
-		}
-	}
 }
