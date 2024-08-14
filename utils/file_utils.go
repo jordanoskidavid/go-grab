@@ -44,12 +44,20 @@ func ReadJson(filename string, data interface{}) error {
 }
 
 func SavePageToFile(page models.PageData) error {
+
+	folderPath := "./scraping_folder"
+
+	err := os.MkdirAll(folderPath, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("error creating folder: %v", err)
+	}
+
 	baseURL, err := getBaseURL(page.URL)
 	if err != nil {
 		return err
 	}
 	fileName := sanitizeFileName(baseURL) + ".json"
-	filePath := filepath.Join(".", fileName)
+	filePath := filepath.Join(folderPath, fileName)
 
 	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
