@@ -3,6 +3,8 @@ package utils
 import (
 	"net/url"
 	"strings"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 func NormalizeURL(urlStr string) string {
@@ -47,4 +49,12 @@ func FormatTextContent(text string) string {
 		}
 	}
 	return strings.TrimSpace(formattedText.String()) // Remove any trailing space
+}
+
+func HashPassword(password string) (string, error) {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hashedPassword), nil
 }

@@ -10,4 +10,5 @@ func SetupRoutes() {
 	http.HandleFunc("/api/get-data", handlers.GetScrapedDataHandler)
 	http.HandleFunc("/api/delete-data", handlers.DeleteScrapedData)
 	http.HandleFunc("/api/generate-api-key", handlers.GenerateAPIKeyHandler)
+	http.HandleFunc("/api/register-user", handlers.RegisterHandler)
 }
