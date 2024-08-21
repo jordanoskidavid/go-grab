@@ -1,7 +1,7 @@
 package main
 
 import (
-	functions "WebScraper/functions"
+	"WebScraper/functions"
 	"WebScraper/routes"
 	"fmt"
 	"log"
