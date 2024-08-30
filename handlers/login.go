@@ -4,12 +4,11 @@ import (
 	"WebScraper/database"
 	"WebScraper/models"
 	"encoding/json"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
-
-	"log"
 
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/bcrypt"
@@ -44,7 +43,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create JWT token with custom Claims including role
+	// Create JWT token with custom claims, including role
 	expirationTime := time.Now().Add(5 * time.Minute)
 	claims := &models.Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -62,24 +61,14 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Store the JWT token in the database
+	if err := database.SaveUserToken(user.ID, tokenString); err != nil {
+		log.Printf("Error saving token to database: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
 	// Send the token to the client
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"access_token": tokenString})
-}
-
-// saveTokenToEnv saves the JWT token to an .env file
-func saveTokenToEnv(token string) error {
-	envFile := ".env"
-	file, err := os.OpenFile(envFile, os.O_APPEND|os.O_WRONLY, 0600)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	_, err = file.WriteString("JWT_TOKEN=" + token + "\n")
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
