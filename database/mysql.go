@@ -63,6 +63,16 @@ func SaveUserToken(userID int, token string) error {
 	return nil
 }
 
+func DeleteUserToken(userID int) error {
+
+	query := "UPDATE Users SET Token = NULL WHERE id = ?"
+	result := DB.Exec(query, userID)
+	if result.Error != nil {
+		return result.Error
+	}
+	return nil
+}
+
 /*
 
 
