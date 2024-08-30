@@ -53,6 +53,16 @@ func GetUserByUsername(username string) (*models.User, error) {
 	return &user, nil
 }
 
+func SaveUserToken(userID int, token string) error {
+	query := "UPDATE Users SET Token = ? WHERE id = ?"
+	result := DB.Exec(query, token, userID)
+
+	if result.Error != nil {
+		return result.Error
+	}
+	return nil
+}
+
 /*
 
 
