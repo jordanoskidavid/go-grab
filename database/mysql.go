@@ -13,7 +13,7 @@ var DB *gorm.DB
 func Connect() (*gorm.DB, error) {
 	log.Println("Connecting to MySQL database...")
 
-	dsn := "root:root@tcp(172.19.0.2:3306)/GrabDB?charset=utf8mb4&parseTime=True&loc=Local"
+	dsn := "root:root@tcp(172.26.0.2:3306)/GrabDB?charset=utf8mb4&parseTime=True&loc=Local"
 
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {

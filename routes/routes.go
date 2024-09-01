@@ -15,4 +15,5 @@ func SetupRoutes() {
 
 	http.HandleFunc("/api/register-user", handlers.RegisterHandler)
 	http.HandleFunc("/api/login-user", handlers.LoginHandler)
+	//http.HandleFunc("/api/crawl", handlers.StartCrawlHandler)
 }
