@@ -22,12 +22,15 @@ var (
 
 func Crawl(baseURL string) {
 	toVisit := []string{baseURL}
+	visitLock := sync.Mutex{}
+	visited := make(map[string]bool)
+	var wg sync.WaitGroup
 
 	for len(toVisit) > 0 {
 		url := toVisit[0]
 		toVisit = toVisit[1:]
 
-		time.Sleep(2 * time.Second) // Rate limiting to make delay between requests to slow down the crawling process because of the riskt of beign blocked
+		time.Sleep(1 * time.Second)
 
 		normalizedURL := utils.NormalizeURL(url)
 
@@ -47,15 +50,20 @@ func Crawl(baseURL string) {
 			continue
 		}
 
+		//fmt.Printf("Found links on %s: %v\n", url, links)
+
 		for _, link := range links {
 			normalizedLink := utils.NormalizeURL(link)
 			visitLock.Lock()
 			if !visited[normalizedLink] {
 				toVisit = append(toVisit, link)
+				//fmt.Printf("Added to visit list: %s\n", normalizedLink)
 			}
 			visitLock.Unlock()
 		}
 	}
+
+	wg.Wait()
 }
 
 func ScrapeAndExtractLinks(pageURL string) ([]string, error) {
@@ -94,11 +102,13 @@ func ScrapeAndExtractLinks(pageURL string) ([]string, error) {
 
 	var links []string
 	err = chromedp.Run(ctx,
-		chromedp.Evaluate(`Array.from(document.querySelectorAll('a[href^="http"]')).map(a => a.href)`, &links),
+		chromedp.Evaluate(`Array.from(document.querySelectorAll('a[href]')).map(a => a.href)`, &links),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error extracting links from %s: %v", pageURL, err)
 	}
+
+	//fmt.Printf("Links found on %s: %v\n", pageURL, links)
 
 	base, err := url.Parse(pageURL)
 	if err != nil {
@@ -116,6 +126,8 @@ func ScrapeAndExtractLinks(pageURL string) ([]string, error) {
 			internalLinks = append(internalLinks, link)
 		}
 	}
+
+	//fmt.Printf("Internal links on %s: %v\n", pageURL, internalLinks)
 
 	return internalLinks, nil
 }

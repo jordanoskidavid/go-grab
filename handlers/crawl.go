@@ -8,7 +8,6 @@ import (
 )
 
 func StartCrawlHandler(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Crawling started"))
 
 	if r.Method != http.MethodPost {
@@ -28,6 +27,6 @@ func StartCrawlHandler(w http.ResponseWriter, r *http.Request) {
 		functions.Crawl(url)
 	}
 
-	w.WriteHeader(http.StatusOK)
+	//w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Crawling completed"))
 }
