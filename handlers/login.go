@@ -43,14 +43,13 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create JWT token with custom claims, including role
-	expirationTime := time.Now().Add(5 * time.Minute)
+	expirationTime := time.Now().Add(60 * time.Minute)
 	claims := &models.Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
-			Subject:   strconv.Itoa(user.ID), // Convert user ID to string
+			Subject:   strconv.Itoa(user.ID),
 		},
-		Role: user.Role, // Include the user's role in the claims
+		Role: user.Role,
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -62,7 +61,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Store the JWT token in the database
-	if err := database.SaveUserToken(user.ID, tokenString); err != nil {
+	if err := database.SaveUserToken(user.ID, tokenString, expirationTime); err != nil {
 		log.Printf("Error saving token to database: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
