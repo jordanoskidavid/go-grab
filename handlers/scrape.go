@@ -8,6 +8,16 @@ import (
 	"path/filepath"
 )
 
+// GetScrapedDataHandler godoc
+// @Summary Download scraped data as a ZIP file
+// @Description Retrieves all scraped data from the "scraping_folder" and provides it as a downloadable ZIP file.
+// @Tags Scraping
+// @Produce application/zip
+// @Success 200 {file} file "ZIP file containing scraped data"
+// @Failure 405 {string} string "Invalid request method"
+// @Failure 500 {string} string "Failed to zip folder"
+// @Router /api/get-data [get]
+
 func GetScrapedDataHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)

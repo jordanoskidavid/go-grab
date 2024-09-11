@@ -16,6 +16,19 @@ import (
 
 var jwtKey = []byte(os.Getenv("JWT_SECRET_KEY"))
 
+// LoginHandler godoc
+// @Summary User login
+// @Description Authenticates a user and returns a JWT token if the login is successful.
+// @Tags Auth
+// @Accept  json
+// @Produce  json
+// @Param login body models.LoginRequest true "Login credentials"
+// @Success 200 {object} map[string]string "access_token"
+// @Failure 400 {string} string "Invalid request payload or missing fields"
+// @Failure 401 {string} string "Invalid credentials"
+// @Failure 500 {string} string "Internal Server Error"
+// @Router /api/login-user [post]
+
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var credentials struct {
 		Username string `json:"username"`

@@ -3,6 +3,7 @@ package database
 import (
 	"WebScraper/models"
 	"log"
+	"time"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -13,7 +14,7 @@ var DB *gorm.DB
 func Connect() (*gorm.DB, error) {
 	log.Println("Connecting to MySQL database...")
 
-	dsn := "root:root@tcp(172.26.0.2:3306)/GrabDB?charset=utf8mb4&parseTime=True&loc=Local"
+	dsn := "root:root@tcp(172.28.0.2:3306)/GrabDB?charset=utf8mb4&parseTime=True&loc=Local"
 
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
@@ -53,9 +54,9 @@ func GetUserByUsername(username string) (*models.User, error) {
 	return &user, nil
 }
 
-func SaveUserToken(userID int, token string) error {
-	query := "UPDATE Users SET Token = ? WHERE id = ?"
-	result := DB.Exec(query, token, userID)
+func SaveUserToken(userID int, token string, expiration time.Time) error {
+	query := "UPDATE Users SET Token = ?, token_expires_at = ? WHERE id = ?"
+	result := DB.Exec(query, token, expiration, userID)
 
 	if result.Error != nil {
 		return result.Error

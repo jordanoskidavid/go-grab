@@ -8,6 +8,19 @@ import (
 	"net/http"
 )
 
+// RegisterHandler godoc
+// @Summary Register a new user
+// @Description Registers a new user with a username and password. The password is hashed before saving.
+// @Tags Auth
+// @Accept  json
+// @Produce  json
+// @Param  user  body  models.User  true  "User data"
+// @Success 201 {object} map[string]string "User registered successfully"
+// @Failure 400 {string} string "Username and password are required or Invalid request payload"
+// @Failure 409 {string} string "Username already exists"
+// @Failure 500 {string} string "Failed to register user or Error checking username"
+// @Router /api/register-user [post]
+
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)

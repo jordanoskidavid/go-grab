@@ -8,6 +8,17 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
+// LogoutHandler godoc
+// @Summary Logout user
+// @Description Logs out the user by deleting the JWT token from the database.
+// @Tags Auth
+// @Security BearerAuth
+// @Produce  plain
+// @Success 200 {string} string "Logged out successfully"
+// @Failure 401 {string} string "Authorization header missing or invalid token"
+// @Failure 500 {string} string "Failed to logout"
+// @Router /api/logout [post]
+
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
