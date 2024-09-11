@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"WebScraper/database"
-	"WebScraper/models"
+	"GoGrab/database"
+	"GoGrab/models"
 	"encoding/json"
 	"log"
 	"net/http"

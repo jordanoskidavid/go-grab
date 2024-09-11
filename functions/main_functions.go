@@ -1,8 +1,8 @@
 package functions
 
 import (
-	"WebScraper/models"
-	"WebScraper/utils"
+	"GoGrab/models"
+	"GoGrab/utils"
 	"context"
 	"fmt"
 	"log"

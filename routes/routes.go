@@ -1,9 +1,9 @@
 package routes
 
 import (
-	_ "WebScraper/docs"
-	"WebScraper/handlers"
-	"WebScraper/middleware"
+	_ "GoGrab/docs"
+	"GoGrab/handlers"
+	"GoGrab/middleware"
 	"net/http"
 
 	httpSwagger "github.com/swaggo/http-swagger"
