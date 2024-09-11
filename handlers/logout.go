@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"WebScraper/database"
+	"GoGrab/database"
 	"net/http"
 	"strconv"
 

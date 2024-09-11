@@ -1,7 +1,7 @@
 package functions
 
 import (
-	"WebScraper/database"
+	"GoGrab/database"
 	"crypto/rand"
 	"encoding/hex"
 	"log"

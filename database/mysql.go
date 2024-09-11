@@ -1,7 +1,7 @@
 package database
 
 import (
-	"WebScraper/models"
+	"GoGrab/models"
 	"log"
 	"time"
 
@@ -62,6 +62,16 @@ func SaveUserToken(userID int, token string, expiration time.Time) error {
 		return result.Error
 	}
 	return nil
+}
+func CheckUserToken(userID int, tokenString string) (bool, error) {
+	var count int
+	query := "SELECT COUNT(*) FROM user_tokens WHERE user_id = ? AND token = ?"
+	result := DB.Exec(query, userID, tokenString).Scan(&count)
+
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return count > 0, nil
 }
 
 func DeleteUserToken(userID int) error {

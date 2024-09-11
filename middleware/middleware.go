@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"WebScraper/models"
+	"GoGrab/models"
 	"context"
 	"errors"
 	"net/http"

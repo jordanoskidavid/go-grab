@@ -1,9 +1,9 @@
 package handlers
 
 import (
-	"WebScraper/database"
-	"WebScraper/models"
-	"WebScraper/utils"
+	"GoGrab/database"
+	"GoGrab/models"
+	"GoGrab/utils"
 	"encoding/json"
 	"net/http"
 )

@@ -1,8 +1,8 @@
 package main
 
 import (
-	"WebScraper/functions"
-	"WebScraper/routes"
+	"GoGrab/functions"
+	"GoGrab/routes"
 	"fmt"
 	"log"
 	"net/http"
