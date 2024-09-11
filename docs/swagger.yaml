@@ -1,0 +1,248 @@
+openapi: 3.0.0
+info:
+  title: WebScraper API
+  description: API for Web Scraping
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080/api
+paths:
+  /login-user:
+    post:
+      summary: User login
+      description: Authenticates a user and returns a JWT token if the login is successful.
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  example: "exampleuser"
+                password:
+                  type: string
+                  example: "examplepassword"
+      responses:
+        '200':
+          description: Successful login, returns a JWT token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        '400':
+          description: Invalid request payload or missing fields
+          content:
+            application/json:
+              schema:
+                type: string
+                example: "Invalid request payload"
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                type: string
+                example: "Invalid credentials"
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: string
+                example: "Internal Server Error"
+
+  /logout:
+    post:
+      summary: Logout user
+      description: Logs out the user by deleting the JWT token from the database.
+      tags:
+        - Auth
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logged out successfully
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Logged out successfully"
+        '401':
+          description: Authorization header missing or invalid token
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Authorization header missing or invalid token"
+        '500':
+          description: Failed to logout
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Failed to logout"
+
+  /register-user:
+    post:
+      summary: Register a new user
+      description: Registers a new user with a username and password. The password is hashed before saving.
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  example: "newuser"
+                password:
+                  type: string
+                  example: "newpassword"
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "User registered successfully"
+        '400':
+          description: Username and password are required or Invalid request payload
+          content:
+            application/json:
+              schema:
+                type: string
+                example: "Username and password are required"
+        '409':
+          description: Username already exists
+          content:
+            application/json:
+              schema:
+                type: string
+                example: "Username already exists"
+        '500':
+          description: Failed to register user or Error checking username
+          content:
+            application/json:
+              schema:
+                type: string
+                example: "Failed to register user"
+
+  /get-data:
+    get:
+      summary: Download scraped data as a ZIP file
+      description: Retrieves all scraped data from the "scraping_folder" and provides it as a downloadable ZIP file.
+      tags:
+        - Scraping
+      responses:
+        '200':
+          description: ZIP file containing scraped data
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '405':
+          description: Invalid request method
+          content:
+            application/json:
+              schema:
+                type: string
+                example: "Invalid request method"
+        '500':
+          description: Failed to zip folder
+          content:
+            application/json:
+              schema:
+                type: string
+                example: "Failed to zip folder"
+
+  /crawl:
+    post:
+      summary: Starts a web crawl process
+      description: Initiates a web scraping process by accepting a list of URLs.
+      tags:
+        - Crawling
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                urls:
+                  type: array
+                  items:
+                    type: string
+                  example: ["http://example.com", "http://example.org"]
+      responses:
+        '200':
+          description: Crawling completed
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Crawling completed"
+        '400':
+          description: Invalid request payload
+          content:
+            application/json:
+              schema:
+                type: string
+                example: "Invalid request payload"
+        '405':
+          description: Invalid request method
+          content:
+            application/json:
+              schema:
+                type: string
+                example: "Invalid request method"
+
+  /delete-data:
+    delete:
+      summary: Deletes all scraped data
+      description: Deletes all files in the scraping folder where the scraped data is stored.
+      tags:
+        - Data
+      responses:
+        '200':
+          description: All files deleted successfully
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "All files deleted successfully"
+        '405':
+          description: Invalid request method
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Invalid request method"
+        '500':
+          description: Unable to read directory or delete file
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Unable to read directory or delete file"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

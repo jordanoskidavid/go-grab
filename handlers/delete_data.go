@@ -7,6 +7,17 @@ import (
 	"path/filepath"
 )
 
+// DeleteScrapedData godoc
+// @Summary Deletes all scraped data
+// @Description Deletes all files in the scraping folder where the scraped data is stored.
+// @Tags Data
+// @Accept  json
+// @Produce text/plain
+// @Success 200 {string} string "All files deleted successfully"
+// @Failure 405 {string} string "Invalid request method"
+// @Failure 500 {string} string "Unable to read directory or delete file"
+// @Router /api/delete-data [delete]
+
 func DeleteScrapedData(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
