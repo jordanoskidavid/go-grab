@@ -63,20 +63,26 @@ func SaveUserToken(userID int, token string, expiration time.Time) error {
 	}
 	return nil
 }
+
 func CheckUserToken(userID int, tokenString string) (bool, error) {
 	var count int
-	query := "SELECT COUNT(*) FROM user_tokens WHERE user_id = ? AND token = ?"
-	result := DB.Exec(query, userID, tokenString).Scan(&count)
 
+	// Use DB.Raw to run the raw SQL query
+	query := "SELECT COUNT(*) FROM Users WHERE ID = ? AND Token = ?"
+	result := DB.Raw(query, userID, tokenString).Scan(&count)
+
+	// Check if there's an error in the query execution
 	if result.Error != nil {
 		return false, result.Error
 	}
+
+	// Return true if the count is greater than 0 (i.e., token exists for the user)
 	return count > 0, nil
 }
 
 func DeleteUserToken(userID int) error {
 
-	query := "UPDATE Users SET Token = NULL WHERE id = ?"
+	query := "UPDATE Users SET Token = NULL WHERE ID = ?"
 	result := DB.Exec(query, userID)
 	if result.Error != nil {
 		return result.Error
